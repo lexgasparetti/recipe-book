@@ -206,7 +206,7 @@ fetch('pinterest-pins.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then
   if(!b){S.boards.push(JSON.parse(JSON.stringify(nb)));ch=true;return}
   (nb.sections||[]).forEach(s=>{b.sections=b.sections||[];if(!b.sections.some(x=>x.id===s.id)){b.sections.push({...s});ch=true}})});
  if(S.tagsV!==1){const tm={...(d.retag||{})};d.pins.forEach(p=>tm[p.id]=p.tags);S.pins.forEach(p=>{const t=tm[p.id];if(!t)return;const u=[...new Set([...(p.tags||[]),...t])];if(u.length!==(p.tags||[]).length){p.tags=u;ch=true}});S.tagsV=1;ch=true}
- const del=S.deleted||{};d.pins.forEach(p=>{if(S.deletedBundled.includes(p.id)||del[p.id]||S.pins.some(x=>x.id===p.id))return;if(!S.boards.some(b=>b.id===p.board))return;S.pins.push(JSON.parse(JSON.stringify(p)));n++;ch=true});
+ const del=S.deleted||{};d.pins.forEach(p=>{if(S.deletedBundled.includes(p.id)||del[p.id]||S.pins.some(x=>x.id===p.id)){const x=S.pins.find(y=>y.id===p.id);if(x&&p.recipe&&!x.recipe){x.recipe=JSON.parse(JSON.stringify(p.recipe));x.updatedAt=Date.now();ch=true}return}if(!S.boards.some(b=>b.id===p.board))return;S.pins.push(JSON.parse(JSON.stringify(p)));n++;ch=true});
  if(ch){save();render();if(n)toast(`📌 Added ${n} pins from Pinterest`)}}).catch(e=>console.warn('pinterest import',e));
 </script>
 <script type="module">
