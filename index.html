@@ -53,7 +53,7 @@ ol,ul{padding-left:20px}li{margin:3px 0}h4{margin:14px 0 4px}
    <button id="newBoard">New board</button><button id="favView">♥ Favorites only</button><button id="exportBtn">Export backup (JSON)</button><button id="importBtn">Import backup</button><button id="clearSample">Clear sample pins</button></div></div>
   <input type="file" id="importFile" accept="application/json" hidden>
  </div>
- <div class="chips" id="boards"></div><div class="boardtools" id="btools"></div><div class="chips" id="tags"></div>
+ <div class="chips" id="boards"></div><div class="chips" id="secs"></div><div class="boardtools" id="btools"></div><div class="chips" id="tags"></div>
 </header>
 <main id="grid"></main>
 <dialog id="detail"></dialog>
@@ -65,6 +65,7 @@ ol,ul{padding-left:20px}li{margin:3px 0}h4{margin:14px 0 4px}
  <label>Note</label><textarea name="note" rows="3"></textarea>
  <label>Source link (optional)</label><input name="link" type="url" placeholder="https://…">
  <label>Board</label><select name="board"></select>
+ <div id="secWrap" hidden><label>Section</label><select name="section"></select></div>
  <label>Tags (comma separated)</label><input name="tags" placeholder="easy, dinner">
  <label class="toggle"><input type="checkbox" name="isRecipe" id="isRecipe"> 🍳 Recipe</label>
  <div id="rf" hidden style="display:grid;gap:10px">
@@ -95,8 +96,9 @@ P('s9','1513201099705-a9746e1e201f','Gift wrapping ideas','b_gift','Kraft paper 
 try{if(!localStorage.getItem(KEY)){const o=localStorage.getItem('lexPinboard.v1');if(o)localStorage.setItem(KEY,o)}}catch(e){}
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}if(!S||!S.boards)S=seed();
 if(!Array.isArray(S.deletedBundled))S.deletedBundled=[];BUNDLED.forEach(b=>{if(!S.pins.some(p=>p.id===b.id)&&!S.deletedBundled.includes(b.id))S.pins.push(JSON.parse(JSON.stringify(b)))});
-function trackDel(ps){ps.forEach(p=>{if(BUNDLED.some(b=>b.id===p.id)&&!S.deletedBundled.includes(p.id))S.deletedBundled.push(p.id)})}
-let view={board:'all',q:'',tag:null,fav:false},editing=null,pendingImg=null;
+function trackDel(ps){ps.forEach(p=>{if((BUNDLED.some(b=>b.id===p.id)||IMPORTED.has(p.id))&&!S.deletedBundled.includes(p.id))S.deletedBundled.push(p.id)})}
+const IMPORTED=new Set();
+let view={board:'all',section:null,q:'',tag:null,fav:false},editing=null,pendingImg=null;
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2600)}
 /* ---- sync support: timestamps + tombstones (works signed out too) ---- */
@@ -113,27 +115,32 @@ function stamp(){const now=Date.now();if(!S.deleted||typeof S.deleted!=='object'
 function initStamps(){if(!S.deleted||typeof S.deleted!=='object')S.deleted={};if(!S.boardsAt)S.boardsAt=0;S.pins.forEach(p=>{if(!p.updatedAt)p.updatedAt=p.created||Date.now()});snap()}
 function writeLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){const d=stamp();let ok=true;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){ok=false;toast('⚠️ Storage is full — export a backup, then delete some uploaded pins or use image URLs.')}if(window.__rbSync)window.__rbSync(d);return ok}
+const secs=id=>((S.boards.find(b=>b.id===id)||{}).sections||[]);const sname=(b,s)=>(secs(b).find(x=>x.id===s)||{}).name||'';
 const bname=id=>(S.boards.find(b=>b.id===id)||{}).name||'No board';
 const safeUrl=u=>/^(https?:|data:image\/)/i.test(u||'')?u:'';
-function filtered(){const q=view.q.toLowerCase();return S.pins.filter(p=>(view.board==='all'||p.board===view.board)&&(!view.fav||p.fav)&&(!view.tag||(p.tags||[]).includes(view.tag))&&(!q||[p.title,p.note,bname(p.board),(p.tags||[]).join(' '),p.recipe?p.recipe.ingredients.join(' '):''].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.created-a.created)}
+function filtered(){const q=view.q.toLowerCase();return S.pins.filter(p=>(view.board==='all'||p.board===view.board)&&(!view.section||(view.section==='__none'?!p.section:p.section===view.section))&&(!view.fav||p.fav)&&(!view.tag||(p.tags||[]).includes(view.tag))&&(!q||[p.title,p.note,bname(p.board),sname(p.board,p.section),(p.tags||[]).join(' '),p.recipe?p.recipe.ingredients.join(' '):''].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.created-a.created)}
 function render(){
  $('#boards').innerHTML=`<button class="chip ${view.board==='all'?'on':''}" data-b="all">All pins</button>`+S.boards.map(b=>`<button class="chip ${view.board===b.id?'on':''}" data-b="${b.id}">${esc(b.name)} · ${S.pins.filter(p=>p.board===b.id).length}</button>`).join('');
- $('#btools').innerHTML=(view.fav?'<span>♥ Favorites</span><button class="btn sm" data-a="unfav">Show all</button>':'')+(view.board!=='all'?`<button class="btn sm" data-a="ren">Rename board</button><button class="btn sm" data-a="del">Delete board</button>`:'');
- const tags=[...new Set(S.pins.filter(p=>view.board==='all'||p.board===view.board).flatMap(p=>p.tags||[]))].sort();
- $('#tags').innerHTML=tags.map(t=>`<button class="chip tag ${view.tag===t?'on':''}" data-t="${esc(t)}">#${esc(t)}</button>`).join('');
+ const ss=view.board!=='all'?secs(view.board):[];
+ $('#secs').innerHTML=ss.length?`<button class="chip tag ${!view.section?'on':''}" data-s="">All sections</button>`+ss.map(x=>`<button class="chip tag ${view.section===x.id?'on':''}" data-s="${x.id}">${esc(x.name)} · ${S.pins.filter(p=>p.board===view.board&&p.section===x.id).length}</button>`).join('')+(S.pins.some(p=>p.board===view.board&&!p.section)?`<button class="chip tag ${view.section==='__none'?'on':''}" data-s="__none">Unsorted · ${S.pins.filter(p=>p.board===view.board&&!p.section).length}</button>`:''):'';
+ $('#btools').innerHTML=(view.fav?'<span>♥ Favorites</span><button class="btn sm" data-a="unfav">Show all</button>':'')+(view.board!=='all'?`<button class="btn sm" data-a="ren">Rename board</button><button class="btn sm" data-a="newsec">New section</button><button class="btn sm" data-a="del">Delete board</button>`:'');
+ const tc={};S.pins.forEach(p=>(p.tags||[]).forEach(t=>tc[t]=(tc[t]||0)+1));const tags=Object.keys(tc).sort((a,b)=>tc[b]-tc[a]||a.localeCompare(b));
+ $('#tags').innerHTML=tags.map(t=>`<button class="chip tag ${view.tag===t?'on':''}" data-t="${esc(t)}">#${esc(t)} · ${tc[t]}</button>`).join('');
  const ps=filtered();
  $('#grid').innerHTML=ps.length?ps.map(p=>`<div class="pin" data-id="${p.id}"><div class="pimg"><img loading="lazy" src="${esc(safeUrl(p.img))}" alt="${esc(p.title)}" onerror="this.style.minHeight='160px';this.alt='Image unavailable'">
  <div class="ov"><div class="top"><button class="btn red sm save" data-a="move">Save</button></div><div class="bot">${p.recipe?`<span class="badge">🍳 ${p.recipe.made?'Made it ✓':'Recipe'}</span>`:'<span></span>'}<button class="heart" data-a="fav" aria-label="Favorite">${p.fav?'❤️':'🤍'}</button></div></div></div>
- <div class="pt">${esc(p.title)}</div><div class="pb">${esc(bname(p.board))}</div></div>`).join(''):`<div class="empty">No pins here yet. Tap the red <b>+</b> to add one.</div>`;
+ <div class="pt">${esc(p.title)}</div><div class="pb">${esc(bname(p.board))}${p.section?' › '+esc(sname(p.board,p.section)):''}</div></div>`).join(''):`<div class="empty">No pins here yet. Tap the red <b>+</b> to add one.</div>`;
 }
 document.addEventListener('click',e=>{const m=$('#menu');if(!m.contains(e.target))m.classList.remove('open')});
 $('#menuBtn').onclick=()=>$('#menu').classList.toggle('open');
-$('#boards').onclick=e=>{const b=e.target.dataset.b;if(b){view.board=b;view.tag=null;render()}};
+$('#boards').onclick=e=>{const b=e.target.dataset.b;if(b){view.board=b;view.section=null;view.tag=null;render()}};
+$('#secs').onclick=e=>{const s=e.target.dataset.s;if(s!==undefined){view.section=s||null;render()}};
 $('#tags').onclick=e=>{const t=e.target.dataset.t;if(t){view.tag=view.tag===t?null:t;render()}};
 $('#btools').onclick=e=>{const a=e.target.dataset.a,b=S.boards.find(x=>x.id===view.board);
  if(a==='unfav'){view.fav=false}
+ if(a==='newsec'&&b){const n=prompt('New section name');if(n&&n.trim()){b.sections=b.sections||[];const x={id:'s_'+uid(),name:n.trim()};b.sections.push(x);view.section=x.id}}
  if(a==='ren'&&b){const n=prompt('Rename board',b.name);if(n&&n.trim())b.name=n.trim()}
- if(a==='del'&&b){const c=S.pins.filter(p=>p.board===b.id).length;if(!confirm(`Delete board "${b.name}"?`+(c?` Its ${c} pin(s) will also be deleted.`:'')))return;trackDel(S.pins.filter(p=>p.board===b.id));S.pins=S.pins.filter(p=>p.board!==b.id);S.boards=S.boards.filter(x=>x!==b);view.board='all'}
+ if(a==='del'&&b){const c=S.pins.filter(p=>p.board===b.id).length;if(!confirm(`Delete board "${b.name}"?`+(c?` Its ${c} pin(s) will also be deleted.`:'')))return;trackDel(S.pins.filter(p=>p.board===b.id));S.pins=S.pins.filter(p=>p.board!==b.id);if(b.id.startsWith('pt_')&&!S.deletedBundled.includes(b.id))S.deletedBundled.push(b.id);S.boards=S.boards.filter(x=>x!==b);view.board='all';view.section=null}
  save();render()};
 $('#q').oninput=e=>{view.q=e.target.value;render()};
 $('#newBoard').onclick=()=>{const n=prompt('New board name');if(n&&n.trim()){const b={id:'b_'+uid(),name:n.trim()};S.boards.push(b);view.board=b.id;save();render()}};
@@ -157,6 +164,7 @@ function openDetail(p,focusMove){const d=$('#detail'),r=p.recipe;
  ${r.ingredients.length?`<h4>Ingredients</h4><ul>${r.ingredients.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}
  ${r.steps.length?`<h4>Steps</h4><ol>${r.steps.map(i=>`<li>${esc(i)}</li>`).join('')}</ol>`:''}`:''}
  <label style="display:block;margin-top:14px">Board</label><select data-a="board">${S.boards.map(b=>`<option value="${b.id}" ${b.id===p.board?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+ ${secs(p.board).length?`<label style="display:block;margin-top:10px">Section</label><select data-a="section"><option value="">— None —</option>${secs(p.board).map(x=>`<option value="${x.id}" ${x.id===p.section?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
  <div class="row">${safeUrl(p.link)&&/^https?:/i.test(p.link)?`<a class="btn red" href="${esc(p.link)}" target="_blank" rel="noopener">Open source ↗</a>`:''}<button class="btn" data-a="edit">Edit</button><button class="btn" data-a="delete">Delete</button></div></div></div>`;
  d.onclick=e=>{if(e.target===d)return d.close();const a=e.target.dataset.a;
   if(a==='close')d.close();
@@ -164,16 +172,19 @@ function openDetail(p,focusMove){const d=$('#detail'),r=p.recipe;
   if(a==='made'){p.recipe.made=e.target.checked;save();render()}
   if(a==='edit'){d.close();openEditor(p)}
   if(a==='delete'&&confirm('Delete this pin?')){trackDel([p]);S.pins=S.pins.filter(x=>x!==p);save();render();d.close();toast('Pin deleted')}};
- d.onchange=e=>{if(e.target.dataset.a==='board'){p.board=e.target.value;save();render();toast('Moved to '+bname(p.board))}};
+ d.onchange=e=>{const a=e.target.dataset.a;if(a==='board'){p.board=e.target.value;delete p.section;save();render();toast('Moved to '+bname(p.board));openDetail(p)}
+  if(a==='section'){if(e.target.value)p.section=e.target.value;else delete p.section;save();render();toast('Moved to '+(p.section?sname(p.board,p.section):bname(p.board)))}};
  d.showModal();if(focusMove)d.querySelector('select').focus()}
 const F=$('#pf');
 $('#isRecipe').onchange=e=>{$('#rf').hidden=!e.target.checked;$('#rf').style.display=e.target.checked?'grid':'none'};
 function openEditor(p){editing=p||null;pendingImg=null;F.reset();$('#fTitle').textContent=p?'Edit pin':'New pin';
  F.board.innerHTML=S.boards.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')+'<option value="__new">+ New board…</option>';
- F.board.value=p?p.board:(view.board!=='all'?view.board:S.boards[0]?.id||'__new');
+ F.board.value=p?p.board:(view.board!=='all'?view.board:S.boards[0]?.id||'__new');fillSec(p?p.section:(view.section&&view.section!=='__none'?view.section:''));
  const r=p&&p.recipe;if(p){F.url.value=p.img.startsWith('data:')?'':p.img;F.title.value=p.title;F.note.value=p.note||'';F.link.value=p.link||'';F.tags.value=(p.tags||[]).join(', ')}
  F.isRecipe.checked=!!r||(!p&&F.board.value==='b_rec');F.ingredients.value=r?r.ingredients.join('\n'):'';F.steps.value=r?r.steps.join('\n'):'';F.prep.value=r?.prep||'';F.cook.value=r?.cook||'';F.servings.value=r?.servings||'';
  $('#isRecipe').onchange({target:F.isRecipe});const pv=$('#prev');pv.style.display=p?'block':'none';pv.src=p?p.img:'';$('#editor').showModal()}
+function fillSec(v){const ss=secs(F.board.value);$('#secWrap').hidden=!ss.length;F.section.innerHTML='<option value="">— None —</option>'+ss.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');F.section.value=ss.some(x=>x.id===v)?v:''}
+F.board.onchange=()=>fillSec(F.section.value);
 $('#addBtn').onclick=()=>openEditor();$('#cancelBtn').onclick=()=>$('#editor').close();
 F.url.oninput=()=>{const pv=$('#prev');pendingImg=null;pv.src=F.url.value;pv.style.display=F.url.value?'block':'none'};
 F.file.onchange=async()=>{const f=F.file.files[0];if(!f)return;try{pendingImg=await compress(f);const pv=$('#prev');pv.src=pendingImg;pv.style.display='block';F.url.value=''}catch(_){toast('Could not read that image')}};
@@ -184,10 +195,19 @@ F.onsubmit=e=>{e.preventDefault();const img=pendingImg||F.url.value.trim()||(edi
  const lines=s=>s.split('\n').map(x=>x.replace(/^\s*(\d+[.)]|[-*•])\s*/,'').trim()).filter(Boolean);
  const data={img,title:F.title.value.trim(),note:F.note.value.trim(),link:F.link.value.trim(),board,tags:F.tags.value.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean)};
  data.recipe=F.isRecipe.checked?{ingredients:lines(F.ingredients.value),steps:lines(F.steps.value),prep:F.prep.value.trim(),cook:F.cook.value.trim(),servings:F.servings.value.trim(),made:editing?.recipe?.made||false}:undefined;
- const prev=JSON.stringify(S);
- if(editing){Object.assign(editing,data);if(!data.recipe)delete editing.recipe}else{const p={id:uid(),fav:false,created:Date.now(),...data};if(!p.recipe)delete p.recipe;S.pins.push(p)}
+ const sec=secs(board).some(x=>x.id===F.section.value)?F.section.value:'';const prev=JSON.stringify(S);
+ if(editing){Object.assign(editing,data);if(!data.recipe)delete editing.recipe;if(sec)editing.section=sec;else delete editing.section}else{const p={id:uid(),fav:false,created:Date.now(),...data};if(!p.recipe)delete p.recipe;if(sec)p.section=sec;S.pins.push(p)}
  if(!save()){S=JSON.parse(prev);return}$('#editor').close();render();toast(editing?'Pin updated':'Pin saved to '+bname(board))};
 initStamps();render();
+/* ---- Pinterest import: merge bundled pins by id, respect deletions (tombstones + deletedBundled) ---- */
+fetch('pinterest-pins.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(!d||!Array.isArray(d.pins))return;let n=0,ch=false;
+ d.pins.forEach(p=>IMPORTED.add(p.id));
+ (d.boards||[]).forEach(nb=>{if(S.deletedBundled.includes(nb.id))return;let b=S.boards.find(x=>x.id===nb.id);
+  if(!b){S.boards.push(JSON.parse(JSON.stringify(nb)));ch=true;return}
+  (nb.sections||[]).forEach(s=>{b.sections=b.sections||[];if(!b.sections.some(x=>x.id===s.id)){b.sections.push({...s});ch=true}})});
+ if(S.tagsV!==1){const tm={...(d.retag||{})};d.pins.forEach(p=>tm[p.id]=p.tags);S.pins.forEach(p=>{const t=tm[p.id];if(!t)return;const u=[...new Set([...(p.tags||[]),...t])];if(u.length!==(p.tags||[]).length){p.tags=u;ch=true}});S.tagsV=1;ch=true}
+ const del=S.deleted||{};d.pins.forEach(p=>{if(S.deletedBundled.includes(p.id)||del[p.id]||S.pins.some(x=>x.id===p.id))return;if(!S.boards.some(b=>b.id===p.board))return;S.pins.push(JSON.parse(JSON.stringify(p)));n++;ch=true});
+ if(ch){save();render();if(n)toast(`📌 Added ${n} pins from Pinterest`)}}).catch(e=>console.warn('pinterest import',e));
 </script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recipe Book</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbf8f3;--card:#fff;--ink:#2b2622;--mute:#8a8079;--red:#e60023;--line:#ece5dc;--r:18px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:20;background:rgba(251,248,243,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{display:flex;gap:10px;align-items:center;padding:10px 16px}
+.logo{font-weight:800;font-size:20px;color:var(--red);white-space:nowrap}
+#q{flex:1;min-width:0;padding:11px 16px;border-radius:999px;border:1px solid var(--line);background:#f1ece5;font:inherit}
+.btn{border:0;border-radius:999px;padding:9px 14px;font:inherit;font-weight:700;cursor:pointer;background:#efe8df;color:var(--ink)}
+.btn.red{background:var(--red);color:#fff}.btn.sm{padding:6px 11px;font-size:13px}
+#addBtn{width:44px;height:44px;padding:0;font-size:26px;line-height:44px;flex:none}
+.menu{position:relative}.menu>div{display:none;position:absolute;right:0;top:46px;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.15);padding:6px;min-width:190px}
+.menu.open>div{display:block}.menu>div button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 12px;font:inherit;border-radius:10px;cursor:pointer}.menu>div button:hover{background:#f4efe8}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 16px 10px;scrollbar-width:none}
+.chip{flex:none;border:0;border-radius:999px;padding:7px 14px;font:inherit;font-weight:600;background:#efe8df;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--ink);color:#fff}.chip.tag{background:#fff;border:1px solid var(--line);font-size:13px}.chip.tag.on{background:var(--red);border-color:var(--red);color:#fff}
+.boardtools{display:flex;gap:8px;padding:0 16px 10px;align-items:center;color:var(--mute);font-size:14px}
+main{padding:12px;columns:2 160px;column-gap:12px}
+@media(min-width:700px){main{columns:3 220px}}@media(min-width:1000px){main{columns:4 220px}}@media(min-width:1300px){main{columns:5 220px}}
+.pin{break-inside:avoid;margin:0 0 14px;cursor:pointer}
+.pimg{position:relative;border-radius:var(--r);overflow:hidden;background:#eee6dc;box-shadow:0 2px 10px rgba(60,40,20,.08)}
+.pimg img{display:block;width:100%;height:auto;min-height:80px}
+.ov{position:absolute;inset:0;background:rgba(0,0,0,.28);opacity:0;transition:.15s;display:flex;flex-direction:column;justify-content:space-between;padding:10px}
+.pin:hover .ov{opacity:1}@media(hover:none){.ov{opacity:1;background:none}.ov .save{display:none}}
+.ov .top{display:flex;justify-content:flex-end}.ov .bot{display:flex;justify-content:space-between;align-items:end}
+.heart{width:36px;height:36px;border-radius:50%;border:0;background:#fff;cursor:pointer;font-size:17px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.badge{background:rgba(255,255,255,.92);border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}
+.pt{font-weight:700;font-size:14px;margin:7px 4px 0}.pb{font-size:12px;color:var(--mute);margin:2px 4px}
+.empty{column-span:all;text-align:center;color:var(--mute);padding:60px 20px}
+dialog{border:0;border-radius:24px;padding:0;max-width:min(920px,96vw);width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(30,20,10,.5)}
+.dwrap{display:grid;grid-template-columns:1fr 1fr;max-height:90vh}.dwrap>img{width:100%;height:100%;max-height:90vh;object-fit:cover}
+.dside{padding:22px;overflow:auto;max-height:90vh}@media(max-width:700px){.dwrap{grid-template-columns:1fr;overflow:auto}.dwrap>img{max-height:50vh}.dside{max-height:none}}
+.dside h2{margin:4px 0 8px}.note{white-space:pre-wrap;color:#4a423c}.meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--mute);font-size:14px;margin:8px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+form{padding:22px;display:grid;gap:10px;max-height:90vh;overflow:auto}
+label{font-size:13px;font-weight:700;color:var(--mute)}input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;background:#fffdfa}
+.two{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.preview{max-height:180px;border-radius:12px;display:none;object-fit:cover}
+.toggle{display:flex;gap:8px;align-items:center;font-weight:700}.toggle input{width:auto}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;opacity:0;transition:.2s;z-index:99;pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+ol,ul{padding-left:20px}li{margin:3px 0}h4{margin:14px 0 4px}
+#authBtn{white-space:nowrap;font-size:13px;display:flex;gap:6px;align-items:center}#authBtn img{width:22px;height:22px;border-radius:50%}@media(max-width:600px){#authBtn .lbl{display:none}}
+</style></head><body>
+<header>
+ <div class="bar"><span class="logo">📖 Recipe Book</span><input id="q" type="search" placeholder="Search pins, notes, boards, tags…">
+  <button class="btn" id="authBtn" title="Sync across devices">Sign in with Google</button>
+  <button class="btn red" id="addBtn" title="Add pin">+</button>
+  <div class="menu" id="menu"><button class="btn" id="menuBtn" aria-label="Menu">⋯</button><div>
+   <button id="newBoard">New board</button><button id="favView">♥ Favorites only</button><button id="exportBtn">Export backup (JSON)</button><button id="importBtn">Import backup</button><button id="clearSample">Clear sample pins</button></div></div>
+  <input type="file" id="importFile" accept="application/json" hidden>
+ </div>
+ <div class="chips" id="boards"></div><div class="chips" id="secs"></div><div class="boardtools" id="btools"></div><div class="chips" id="tags"></div>
+</header>
+<main id="grid"></main>
+<dialog id="detail"></dialog>
+<dialog id="editor"><form id="pf" method="dialog">
+ <h2 id="fTitle" style="margin:0">New pin</h2>
+ <label>Image URL</label><input name="url" placeholder="https://…">
+ <label>…or upload a photo</label><input type="file" name="file" accept="image/*"><img class="preview" id="prev" alt="">
+ <label>Title</label><input name="title" required>
+ <label>Note</label><textarea name="note" rows="3"></textarea>
+ <label>Source link (optional)</label><input name="link" type="url" placeholder="https://…">
+ <label>Board</label><select name="board"></select>
+ <div id="secWrap" hidden><label>Section</label><select name="section"></select></div>
+ <label>Tags (comma separated)</label><input name="tags" placeholder="easy, dinner">
+ <label class="toggle"><input type="checkbox" name="isRecipe" id="isRecipe"> 🍳 Recipe</label>
+ <div id="rf" hidden style="display:grid;gap:10px">
+  <label>Ingredients (one per line)</label><textarea name="ingredients" rows="4"></textarea>
+  <label>Steps (one per line)</label><textarea name="steps" rows="4"></textarea>
+  <div class="two"><div><label>Prep</label><input name="prep" placeholder="10 min"></div><div><label>Cook</label><input name="cook" placeholder="20 min"></div><div><label>Servings</label><input name="servings" placeholder="4"></div></div>
+ </div>
+ <div class="row"><button class="btn red" value="save" id="saveBtn">Save</button><button class="btn" type="button" id="cancelBtn">Cancel</button></div>
+</form></dialog>
+<div id="toast"></div>
+<script>
+const KEY='recipeBook.v1';const U=(id)=>`https://images.unsplash.com/photo-${id}?w=600&q=80&auto=format&fit=crop`;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const BUNDLED=[{"id": "bp_chicken_piccata", "img": "https://thecozycook.com/wp-content/uploads/2021/05/Chicken-Piccata-f2.jpg", "title": "Chicken Piccata", "board": "b_rec", "note": "Making this Tue Oct 20", "tags": ["chicken", "dinner", "italian"], "link": "https://thecozycook.com/chicken-piccata/", "fav": false, "sample": false, "created": 1792458000000, "recipe": {"ingredients": ["2 large boneless skinless chicken breasts", "1 teaspoon salt", "½ teaspoon pepper", "⅓ cup flour", "¼ cup Parmesan cheese (finely grated)", "1 teaspoon garlic powder", "3 tablespoons olive oil", "1 tablespoon salted butter", "½ cup dry white wine (like chardonnay or pinot grigio)", "4 cloves garlic (thinly sliced)", "2 tablespoons capers (drained)", "1 cup chicken broth", "2 tablespoons lemon juice", "2 tablespoons cold salted butter", "¼ cup fresh parsley (roughly chopped)"], "steps": ["Prepare the chicken: Combine the flour, Parmesan cheese, garlic powder, salt, and pepper on a large plate. Set aside.", "Cut each chicken breast in half lengthwise. Place in between saran wrap and use a meat tenderizer to pound it very thin, about ¼ inch thick. It will plump more once it’s cooked so pounding thin is key.", "Pat the chicken dry and dredge each side in the flour mixture. Tap off excess.", "Heat the olive oil and butter in a large skillet over medium-high heat. Sear the chicken in batches for 3-4 minutes per side, until a golden crust has developed. Add a splash of olive oil and/or reduce heat as needed during cooking. Set the chicken aside on a plate and turn off heat when finished.", "Prepare the sauce: Add the wine and set heat to medium. Bubble gently for 4-5 minutes, until just a small amount of liquid remains. Use a silicone spatula to “clean” any remaining brown flecks on the pan while the wine reduces. This will add flavor.", "Add the garlic and cook for 1 minute. Add the capers, chicken broth, and lemon juice and stir to combine.", "Combine: Add the chicken back along with any juices from the plate.", "Spoon the sauce over the chicken. Cover partially and cook for 3-5 minutes. The sauce will thicken slightly and become more flavorful.", "Reduce heat to low. Add 2 Tablespoons cold butter and let it melt into the sauce. Tilt the pan to distribute the sauce throughout and spoon it over the chicken again. Remove from heat.", "Garnish with parsley and serve. My Garlic Parmesan Pasta, Buttered Noodles, or Creamy Lemon Pasta is great with this!"], "prep": "25 min", "cook": "30 min", "servings": "4", "made": false}}];
+function seed(){const B=[['b_rec','Recipes'],['b_herb','Indoor herb garden'],['b_cozy','Cozy home'],['b_gift','Gift ideas']].map(([id,name])=>({id,name}));
+const P=(id,img,title,board,note,tags,r)=>Object.assign({id,img:U(img),title,board,note,tags,link:'',fav:false,sample:true,created:Date.now()},r?{recipe:r}:{});
+return{boards:B,pins:[
+P('s1','1565299624946-b28f40a0ae38','Margherita pizza','b_rec','Use fresh basil from the herb garden!',['dinner','italian'],{ingredients:['1 pizza dough','1/2 cup tomato sauce','8 oz fresh mozzarella','Fresh basil','Olive oil, salt'],steps:['Preheat oven to 500°F with a pan or stone inside.','Stretch dough and spread sauce.','Top with torn mozzarella.','Bake 8–10 min until bubbly.','Finish with basil and olive oil.'],prep:'15 min',cook:'10 min',servings:'2',made:false}),
+P('s2','1512621776951-a57141f2eefd','Rainbow grain bowl','b_rec','Great for meal prep.',['healthy','lunch'],{ingredients:['1 cup quinoa','1 avocado','1 cup chickpeas','Cherry tomatoes','Lemon-tahini dressing'],steps:['Cook quinoa.','Roast chickpeas at 425°F for 20 min.','Assemble bowls and drizzle dressing.'],prep:'10 min',cook:'20 min',servings:'2',made:true}),
+P('s3','1603105037880-880cd4edfb0d','Cozy vegetable soup','b_rec','Perfect for cold nights by the fireplace.',['soup','easy'],{ingredients:['1 onion','2 carrots','2 celery stalks','1 can tomatoes','4 cups broth','Thyme & parsley'],steps:['Sauté onion, carrot, celery 8 min.','Add tomatoes, broth and thyme.','Simmer 25 min, season, top with parsley.'],prep:'10 min',cook:'30 min',servings:'4',made:false}),
+P('s4','1540189549336-e6e99c3679fe','Herby summer salad','b_rec','Mint + basil + parsley.',['salad','herbs'],{ingredients:['Mixed greens','Handful of mint, basil, parsley','1 cucumber','Feta','Lemon vinaigrette'],steps:['Tear herbs and greens.','Slice cucumber.','Toss with feta and vinaigrette.'],prep:'10 min',cook:'0 min',servings:'2',made:false}),
+P('s5','1515586000433-45406d8e6662','Windowsill rosemary','b_herb','South-facing window, water when top inch is dry.',['basil','light']),
+P('s6','1416879595882-3373a0480b5b','Potting setup','b_herb','Terracotta pots + drip lines for 10 plants.',['watering']),
+P('s7','1592150621744-aca64f48394a','Plant-filled corner','b_cozy','Warm wood, lots of green.',['living room']),
+P('s8','1586023492125-27b2c045efd7','Reading nook','b_cozy','Soft lamp + throw blanket.',['bedroom']),
+P('s9','1513201099705-a9746e1e201f','Gift wrapping ideas','b_gift','Kraft paper + twine + sprig of rosemary.',['christmas']),
+...BUNDLED.map(b=>({...b,recipe:b.recipe&&{...b.recipe}}))],deletedBundled:[]};}
+try{if(!localStorage.getItem(KEY)){const o=localStorage.getItem('lexPinboard.v1');if(o)localStorage.setItem(KEY,o)}}catch(e){}
+let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}if(!S||!S.boards)S=seed();
+if(!Array.isArray(S.deletedBundled))S.deletedBundled=[];BUNDLED.forEach(b=>{if(!S.pins.some(p=>p.id===b.id)&&!S.deletedBundled.includes(b.id))S.pins.push(JSON.parse(JSON.stringify(b)))});
+function trackDel(ps){ps.forEach(p=>{if((BUNDLED.some(b=>b.id===p.id)||IMPORTED.has(p.id))&&!S.deletedBundled.includes(p.id))S.deletedBundled.push(p.id)})}
+const IMPORTED=new Set();
+let view={board:'all',section:null,q:'',tag:null,fav:false},editing=null,pendingImg=null;
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2600)}
+/* ---- sync support: timestamps + tombstones (works signed out too) ---- */
+let LAST={pins:{},boards:''};
+function pinJson(p){const{updatedAt,...r}=p;return JSON.stringify(r)}
+function boardsJson(){return JSON.stringify([S.boards,S.deletedBundled])}
+function snap(){LAST={pins:{},boards:boardsJson()};S.pins.forEach(p=>LAST.pins[p.id]=pinJson(p))}
+function stamp(){const now=Date.now();if(!S.deleted||typeof S.deleted!=='object')S.deleted={};if(!S.boardsAt)S.boardsAt=0;
+ const changed=[],seen={};S.pins.forEach(p=>{const j=pinJson(p);seen[p.id]=1;
+  if(LAST.pins[p.id]===undefined){if(!p.updatedAt)p.updatedAt=now;changed.push(p.id);if(S.deleted[p.id])delete S.deleted[p.id]}
+  else if(LAST.pins[p.id]!==j){p.updatedAt=now;changed.push(p.id)}});
+ const removed=Object.keys(LAST.pins).filter(id=>!seen[id]);removed.forEach(id=>S.deleted[id]=now);
+ const bj=boardsJson(),bc=bj!==LAST.boards||removed.length>0;if(bj!==LAST.boards)S.boardsAt=now;snap();return{changed,removed,boards:bc}}
+function initStamps(){if(!S.deleted||typeof S.deleted!=='object')S.deleted={};if(!S.boardsAt)S.boardsAt=0;S.pins.forEach(p=>{if(!p.updatedAt)p.updatedAt=p.created||Date.now()});snap()}
+function writeLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){const d=stamp();let ok=true;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){ok=false;toast('⚠️ Storage is full — export a backup, then delete some uploaded pins or use image URLs.')}if(window.__rbSync)window.__rbSync(d);return ok}
+const secs=id=>((S.boards.find(b=>b.id===id)||{}).sections||[]);const sname=(b,s)=>(secs(b).find(x=>x.id===s)||{}).name||'';
+const bname=id=>(S.boards.find(b=>b.id===id)||{}).name||'No board';
+const safeUrl=u=>/^(https?:|data:image\/)/i.test(u||'')?u:'';
+function filtered(){const q=view.q.toLowerCase();return S.pins.filter(p=>(view.board==='all'||p.board===view.board)&&(!view.section||(view.section==='__none'?!p.section:p.section===view.section))&&(!view.fav||p.fav)&&(!view.tag||(p.tags||[]).includes(view.tag))&&(!q||[p.title,p.note,bname(p.board),sname(p.board,p.section),(p.tags||[]).join(' '),p.recipe?p.recipe.ingredients.join(' '):''].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.created-a.created)}
+function render(){
+ $('#boards').innerHTML=`<button class="chip ${view.board==='all'?'on':''}" data-b="all">All pins</button>`+S.boards.map(b=>`<button class="chip ${view.board===b.id?'on':''}" data-b="${b.id}">${esc(b.name)} · ${S.pins.filter(p=>p.board===b.id).length}</button>`).join('');
+ const ss=view.board!=='all'?secs(view.board):[];
+ $('#secs').innerHTML=ss.length?`<button class="chip tag ${!view.section?'on':''}" data-s="">All sections</button>`+ss.map(x=>`<button class="chip tag ${view.section===x.id?'on':''}" data-s="${x.id}">${esc(x.name)} · ${S.pins.filter(p=>p.board===view.board&&p.section===x.id).length}</button>`).join('')+(S.pins.some(p=>p.board===view.board&&!p.section)?`<button class="chip tag ${view.section==='__none'?'on':''}" data-s="__none">Unsorted · ${S.pins.filter(p=>p.board===view.board&&!p.section).length}</button>`:''):'';
+ $('#btools').innerHTML=(view.fav?'<span>♥ Favorites</span><button class="btn sm" data-a="unfav">Show all</button>':'')+(view.board!=='all'?`<button class="btn sm" data-a="ren">Rename board</button><button class="btn sm" data-a="newsec">New section</button><button class="btn sm" data-a="del">Delete board</button>`:'');
+ const tc={};S.pins.forEach(p=>(p.tags||[]).forEach(t=>tc[t]=(tc[t]||0)+1));const tags=Object.keys(tc).sort((a,b)=>tc[b]-tc[a]||a.localeCompare(b));
+ $('#tags').innerHTML=tags.map(t=>`<button class="chip tag ${view.tag===t?'on':''}" data-t="${esc(t)}">#${esc(t)} · ${tc[t]}</button>`).join('');
+ const ps=filtered();
+ $('#grid').innerHTML=ps.length?ps.map(p=>`<div class="pin" data-id="${p.id}"><div class="pimg"><img loading="lazy" src="${esc(safeUrl(p.img))}" alt="${esc(p.title)}" onerror="this.style.minHeight='160px';this.alt='Image unavailable'">
+ <div class="ov"><div class="top"><button class="btn red sm save" data-a="move">Save</button></div><div class="bot">${p.recipe?`<span class="badge">🍳 ${p.recipe.made?'Made it ✓':'Recipe'}</span>`:'<span></span>'}<button class="heart" data-a="fav" aria-label="Favorite">${p.fav?'❤️':'🤍'}</button></div></div></div>
+ <div class="pt">${esc(p.title)}</div><div class="pb">${esc(bname(p.board))}${p.section?' › '+esc(sname(p.board,p.section)):''}</div></div>`).join(''):`<div class="empty">No pins here yet. Tap the red <b>+</b> to add one.</div>`;
+}
+document.addEventListener('click',e=>{const m=$('#menu');if(!m.contains(e.target))m.classList.remove('open')});
+$('#menuBtn').onclick=()=>$('#menu').classList.toggle('open');
+$('#boards').onclick=e=>{const b=e.target.dataset.b;if(b){view.board=b;view.section=null;view.tag=null;render()}};
+$('#secs').onclick=e=>{const s=e.target.dataset.s;if(s!==undefined){view.section=s||null;render()}};
+$('#tags').onclick=e=>{const t=e.target.dataset.t;if(t){view.tag=view.tag===t?null:t;render()}};
+$('#btools').onclick=e=>{const a=e.target.dataset.a,b=S.boards.find(x=>x.id===view.board);
+ if(a==='unfav'){view.fav=false}
+ if(a==='newsec'&&b){const n=prompt('New section name');if(n&&n.trim()){b.sections=b.sections||[];const x={id:'s_'+uid(),name:n.trim()};b.sections.push(x);view.section=x.id}}
+ if(a==='ren'&&b){const n=prompt('Rename board',b.name);if(n&&n.trim())b.name=n.trim()}
+ if(a==='del'&&b){const c=S.pins.filter(p=>p.board===b.id).length;if(!confirm(`Delete board "${b.name}"?`+(c?` Its ${c} pin(s) will also be deleted.`:'')))return;trackDel(S.pins.filter(p=>p.board===b.id));S.pins=S.pins.filter(p=>p.board!==b.id);if(b.id.startsWith('pt_')&&!S.deletedBundled.includes(b.id))S.deletedBundled.push(b.id);S.boards=S.boards.filter(x=>x!==b);view.board='all';view.section=null}
+ save();render()};
+$('#q').oninput=e=>{view.q=e.target.value;render()};
+$('#newBoard').onclick=()=>{const n=prompt('New board name');if(n&&n.trim()){const b={id:'b_'+uid(),name:n.trim()};S.boards.push(b);view.board=b.id;save();render()}};
+$('#favView').onclick=()=>{view.fav=!view.fav;render()};
+$('#clearSample').onclick=()=>{const n=S.pins.filter(p=>p.sample).length;if(!n)return toast('No sample pins left');if(confirm(`Remove ${n} sample pins? Boards stay.`)){S.pins=S.pins.filter(p=>!p.sample);save();render();toast('Sample pins cleared')}};
+$('#exportBtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download=`recipe-book-backup-${new Date().toLocaleDateString("en-CA")}.json`;a.click();toast('Backup downloaded')};
+$('#importBtn').onclick=()=>$('#importFile').click();
+$('#importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.boards)||!Array.isArray(d.pins))throw 0;
+ const prev=S;S=d;if(save()){view={board:'all',q:'',tag:null,fav:false};render();toast(`Imported ${d.pins.length} pins`)}else S=prev}catch(_){toast('That file isn’t a valid pinboard backup')}e.target.value=''};
+function find(id){return S.pins.find(p=>p.id===id)}
+$('#grid').onclick=e=>{const el=e.target.closest('.pin');if(!el)return;const p=find(el.dataset.id),a=e.target.dataset.a;
+ if(a==='fav'){e.stopPropagation();p.fav=!p.fav;save();render();return}
+ if(a==='move'){e.stopPropagation();openDetail(p,true);return}openDetail(p)};
+function openDetail(p,focusMove){const d=$('#detail'),r=p.recipe;
+ d.innerHTML=`<div class="dwrap"><img src="${esc(safeUrl(p.img))}" alt=""><div class="dside">
+ <div class="row" style="margin:0;justify-content:space-between"><button class="heart" data-a="fav">${p.fav?'❤️':'🤍'}</button><button class="btn sm" data-a="close">✕</button></div>
+ <h2>${esc(p.title)}</h2>${p.note?`<div class="note">${esc(p.note)}</div>`:''}
+ ${(p.tags||[]).length?`<div class="meta">${p.tags.map(t=>'#'+esc(t)).join(' ')}</div>`:''}
+ ${r?`<div class="meta">${r.prep?`<span>⏱ Prep ${esc(r.prep)}</span>`:''}${r.cook?`<span>🔥 Cook ${esc(r.cook)}</span>`:''}${r.servings?`<span>🍽 Serves ${esc(r.servings)}</span>`:''}</div>
+ <label class="toggle"><input type="checkbox" data-a="made" ${r.made?'checked':''}> Made it!</label>
+ ${r.ingredients.length?`<h4>Ingredients</h4><ul>${r.ingredients.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}
+ ${r.steps.length?`<h4>Steps</h4><ol>${r.steps.map(i=>`<li>${esc(i)}</li>`).join('')}</ol>`:''}`:''}
+ <label style="display:block;margin-top:14px">Board</label><select data-a="board">${S.boards.map(b=>`<option value="${b.id}" ${b.id===p.board?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+ ${secs(p.board).length?`<label style="display:block;margin-top:10px">Section</label><select data-a="section"><option value="">— None —</option>${secs(p.board).map(x=>`<option value="${x.id}" ${x.id===p.section?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
+ <div class="row">${safeUrl(p.link)&&/^https?:/i.test(p.link)?`<a class="btn red" href="${esc(p.link)}" target="_blank" rel="noopener">Open source ↗</a>`:''}<button class="btn" data-a="edit">Edit</button><button class="btn" data-a="delete">Delete</button></div></div></div>`;
+ d.onclick=e=>{if(e.target===d)return d.close();const a=e.target.dataset.a;
+  if(a==='close')d.close();
+  if(a==='fav'){p.fav=!p.fav;e.target.textContent=p.fav?'❤️':'🤍';save();render()}
+  if(a==='made'){p.recipe.made=e.target.checked;save();render()}
+  if(a==='edit'){d.close();openEditor(p)}
+  if(a==='delete'&&confirm('Delete this pin?')){trackDel([p]);S.pins=S.pins.filter(x=>x!==p);save();render();d.close();toast('Pin deleted')}};
+ d.onchange=e=>{const a=e.target.dataset.a;if(a==='board'){p.board=e.target.value;delete p.section;save();render();toast('Moved to '+bname(p.board));openDetail(p)}
+  if(a==='section'){if(e.target.value)p.section=e.target.value;else delete p.section;save();render();toast('Moved to '+(p.section?sname(p.board,p.section):bname(p.board)))}};
+ d.showModal();if(focusMove)d.querySelector('select').focus()}
+const F=$('#pf');
+$('#isRecipe').onchange=e=>{$('#rf').hidden=!e.target.checked;$('#rf').style.display=e.target.checked?'grid':'none'};
+function openEditor(p){editing=p||null;pendingImg=null;F.reset();$('#fTitle').textContent=p?'Edit pin':'New pin';
+ F.board.innerHTML=S.boards.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')+'<option value="__new">+ New board…</option>';
+ F.board.value=p?p.board:(view.board!=='all'?view.board:S.boards[0]?.id||'__new');fillSec(p?p.section:(view.section&&view.section!=='__none'?view.section:''));
+ const r=p&&p.recipe;if(p){F.url.value=p.img.startsWith('data:')?'':p.img;F.title.value=p.title;F.note.value=p.note||'';F.link.value=p.link||'';F.tags.value=(p.tags||[]).join(', ')}
+ F.isRecipe.checked=!!r||(!p&&F.board.value==='b_rec');F.ingredients.value=r?r.ingredients.join('\n'):'';F.steps.value=r?r.steps.join('\n'):'';F.prep.value=r?.prep||'';F.cook.value=r?.cook||'';F.servings.value=r?.servings||'';
+ $('#isRecipe').onchange({target:F.isRecipe});const pv=$('#prev');pv.style.display=p?'block':'none';pv.src=p?p.img:'';$('#editor').showModal()}
+function fillSec(v){const ss=secs(F.board.value);$('#secWrap').hidden=!ss.length;F.section.innerHTML='<option value="">— None —</option>'+ss.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');F.section.value=ss.some(x=>x.id===v)?v:''}
+F.board.onchange=()=>fillSec(F.section.value);
+$('#addBtn').onclick=()=>openEditor();$('#cancelBtn').onclick=()=>$('#editor').close();
+F.url.oninput=()=>{const pv=$('#prev');pendingImg=null;pv.src=F.url.value;pv.style.display=F.url.value?'block':'none'};
+F.file.onchange=async()=>{const f=F.file.files[0];if(!f)return;try{pendingImg=await compress(f);const pv=$('#prev');pv.src=pendingImg;pv.style.display='block';F.url.value=''}catch(_){toast('Could not read that image')}};
+function compress(file,max=1200,q=.82){return new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=rej;fr.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{let{width:w,height:h}=im;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);res(c.toDataURL('image/jpeg',q))};im.src=fr.result};fr.readAsDataURL(file)})}
+F.onsubmit=e=>{e.preventDefault();const img=pendingImg||F.url.value.trim()||(editing&&editing.img);
+ if(!img||!safeUrl(img))return toast('Add an image URL (https://…) or upload a photo');
+ let board=F.board.value;if(board==='__new'){const n=prompt('New board name');if(!n||!n.trim())return;const b={id:'b_'+uid(),name:n.trim()};S.boards.push(b);board=b.id}
+ const lines=s=>s.split('\n').map(x=>x.replace(/^\s*(\d+[.)]|[-*•])\s*/,'').trim()).filter(Boolean);
+ const data={img,title:F.title.value.trim(),note:F.note.value.trim(),link:F.link.value.trim(),board,tags:F.tags.value.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean)};
+ data.recipe=F.isRecipe.checked?{ingredients:lines(F.ingredients.value),steps:lines(F.steps.value),prep:F.prep.value.trim(),cook:F.cook.value.trim(),servings:F.servings.value.trim(),made:editing?.recipe?.made||false}:undefined;
+ const sec=secs(board).some(x=>x.id===F.section.value)?F.section.value:'';const prev=JSON.stringify(S);
+ if(editing){Object.assign(editing,data);if(!data.recipe)delete editing.recipe;if(sec)editing.section=sec;else delete editing.section}else{const p={id:uid(),fav:false,created:Date.now(),...data};if(!p.recipe)delete p.recipe;if(sec)p.section=sec;S.pins.push(p)}
+ if(!save()){S=JSON.parse(prev);return}$('#editor').close();render();toast(editing?'Pin updated':'Pin saved to '+bname(board))};
+initStamps();render();
+/* ---- Pinterest import: merge bundled pins by id, respect deletions (tombstones + deletedBundled) ---- */
+fetch('pinterest-pins.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(!d||!Array.isArray(d.pins))return;let n=0,ch=false;
+ d.pins.forEach(p=>IMPORTED.add(p.id));
+ (d.boards||[]).forEach(nb=>{if(S.deletedBundled.includes(nb.id))return;let b=S.boards.find(x=>x.id===nb.id);
+  if(!b){S.boards.push(JSON.parse(JSON.stringify(nb)));ch=true;return}
+  (nb.sections||[]).forEach(s=>{b.sections=b.sections||[];if(!b.sections.some(x=>x.id===s.id)){b.sections.push({...s});ch=true}})});
+ if(S.tagsV!==1){const tm={...(d.retag||{})};d.pins.forEach(p=>tm[p.id]=p.tags);S.pins.forEach(p=>{const t=tm[p.id];if(!t)return;const u=[...new Set([...(p.tags||[]),...t])];if(u.length!==(p.tags||[]).length){p.tags=u;ch=true}});S.tagsV=1;ch=true}
+ const del=S.deleted||{};d.pins.forEach(p=>{if(S.deletedBundled.includes(p.id)||del[p.id]||S.pins.some(x=>x.id===p.id))return;if(!S.boards.some(b=>b.id===p.board))return;S.pins.push(JSON.parse(JSON.stringify(p)));n++;ch=true});
+ if(ch){save();render();if(n)toast(`📌 Added ${n} pins from Pinterest`)}}).catch(e=>console.warn('pinterest import',e));
+</script>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut,setPersistence,browserLocalPersistence}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getFirestore,doc,collection,getDoc,getDocs,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const app=initializeApp({apiKey:"AIzaSyCVMokUkUCGWe-MJowo8lyjFHNLEGR2OT4",authDomain:"recipe-book-lex-2ec15.firebaseapp.com",projectId:"recipe-book-lex-2ec15",storageBucket:"recipe-book-lex-2ec15.firebasestorage.app",messagingSenderId:"1029738704460",appId:"1:1029738704460:web:4019394d94d0755c504ee9"});
+const auth=getAuth(app),db=getFirestore(app),btn=document.getElementById('authBtn');
+const clean=o=>JSON.parse(JSON.stringify(o));
+let user=null,unsubs=[],ready=false,queue=null;
+const stateRef=u=>doc(db,'users',u,'data','state'),pinsCol=u=>collection(db,'users',u,'pins'),pinRef=(u,id)=>doc(db,'users',u,'pins',id);
+const isMobile=/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+function paint(){if(user){const ph=user.photoURL?`<img src="${esc(user.photoURL)}" alt="" referrerpolicy="no-referrer">`:'☁️';btn.innerHTML=`${ph}<span class="lbl">${ready?'Synced':'Syncing…'}</span>`;btn.title=`Signed in as ${user.email} — tap to sign out`}else{btn.innerHTML='<span>G</span><span class="lbl">Sign in with Google</span>';btn.title='Sign in to sync across devices'}}
+paint();
+setPersistence(auth,browserLocalPersistence).catch(()=>{});
+getRedirectResult(auth).catch(e=>{console.warn('redirect sign-in',e);toast('Sign-in failed: '+(e.code||e.message))});
+btn.onclick=async()=>{
+ if(user){if(confirm(`Signed in as ${user.email}.\nSign out? Recipes stay on this device.`))await signOut(auth);return}
+ const prov=new GoogleAuthProvider();prov.setCustomParameters({prompt:'select_account'});
+ try{await signInWithPopup(auth,prov)}catch(e){
+  if(['auth/popup-blocked','auth/operation-not-supported-in-environment','auth/web-storage-unsupported'].includes(e.code)||(isMobile&&e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')){try{await signInWithRedirect(auth,prov)}catch(e2){toast('Sign-in failed: '+(e2.code||e2.message))}}
+  else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')toast('Sign-in failed: '+(e.code||e.message))}};
+async function commit(ops){for(let i=0;i<ops.length;i+=400){const b=writeBatch(db);ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}}
+function stateDoc(){return clean({boards:S.boards,deletedBundled:S.deletedBundled||[],boardsAt:S.boardsAt||0,deleted:S.deleted||{}})}
+// push local changes (called from save())
+window.__rbSync=d=>{if(!user)return;if(!ready){queue=true;return}const u=user.uid,ops=[];
+ d.changed.forEach(id=>{const p=S.pins.find(x=>x.id===id);if(p)ops.push(b=>b.set(pinRef(u,id),clean(p)))});
+ d.removed.forEach(id=>ops.push(b=>b.delete(pinRef(u,id))));
+ if(d.boards)ops.push(b=>b.set(stateRef(u),stateDoc()));
+ if(ops.length)commit(ops).catch(e=>{console.error(e);toast('⚠️ Cloud save failed: '+(e.code||e.message))})};
+function applyLocal(){writeLocal();snap();render()}
+async function firstSync(u){
+ const[st,ps]=await Promise.all([getDoc(stateRef(u)),getDocs(pinsCol(u))]);
+ const remote={};ps.forEach(x=>remote[x.id]=x.data());const rs=st.exists()?st.data():null,ops=[];
+ if(!rs&&!ps.size){S.pins.forEach(p=>ops.push(b=>b.set(pinRef(u,p.id),clean(p))));ops.push(b=>b.set(stateRef(u),stateDoc()));await commit(ops);return}
+ // merge tombstones
+ const del={...(rs?.deleted||{})};Object.entries(S.deleted||{}).forEach(([k,v])=>{if(!(del[k]>=v))del[k]=v});S.deleted=del;
+ S.deletedBundled=[...new Set([...(S.deletedBundled||[]),...(rs?.deletedBundled||[])])];
+ // merge boards: union by id, newest side's names/order first
+ if(rs){const newer=(rs.boardsAt||0)>(S.boardsAt||0),A=newer?rs.boards||[]:S.boards,B=newer?S.boards:rs.boards||[];S.boards=[...A,...B.filter(b=>!A.some(a=>a.id===b.id))];S.boardsAt=Math.max(rs.boardsAt||0,S.boardsAt||0)}
+ // merge pins by id, newest updatedAt wins; tombstone wins if newer
+ const local={};S.pins.forEach(p=>local[p.id]=p);const out=[];
+ new Set([...Object.keys(local),...Object.keys(remote)]).forEach(id=>{const l=local[id],r=remote[id];
+  const w=!l?r:!r?l:((r.updatedAt||0)>(l.updatedAt||0)?r:l),t=del[id]||0;
+  if(t&&t>=(w.updatedAt||0)){if(r)ops.push(b=>b.delete(pinRef(u,id)));return}
+  out.push(w);if(w!==r&&(!r||JSON.stringify(clean(w))!==JSON.stringify(r)))ops.push(b=>b.set(pinRef(u,id),clean(w)))});
+ S.pins=out;ops.push(b=>b.set(stateRef(u),stateDoc()));applyLocal();await commit(ops)}
+function listen(u){
+ unsubs.push(onSnapshot(pinsCol(u),snapS=>{if(snapS.metadata.hasPendingWrites)return;let dirty=false;
+  snapS.docChanges().forEach(ch=>{const id=ch.doc.id,i=S.pins.findIndex(p=>p.id===id);
+   if(ch.type==='removed'){if(i>=0){S.pins.splice(i,1);dirty=true}return}
+   const r=ch.doc.data();if((S.deleted||{})[id]>=(r.updatedAt||0))return;
+   if(i<0){S.pins.push(r);dirty=true}else if((r.updatedAt||0)>=(S.pins[i].updatedAt||0)&&JSON.stringify(r)!==JSON.stringify(clean(S.pins[i]))){S.pins[i]=r;dirty=true}});
+  if(dirty)applyLocal()},e=>console.error('pins listener',e)));
+ unsubs.push(onSnapshot(stateRef(u),x=>{if(x.metadata.hasPendingWrites||!x.exists())return;const r=x.data();
+  S.deleted={...(S.deleted||{}),...(r.deleted||{})};S.deletedBundled=[...new Set([...(S.deletedBundled||[]),...(r.deletedBundled||[])])];
+  if((r.boardsAt||0)>(S.boardsAt||0)){S.boards=r.boards||[];S.boardsAt=r.boardsAt;if(view.board!=='all'&&!S.boards.some(b=>b.id===view.board))view.board='all'}
+  applyLocal()},e=>console.error('state listener',e)))}
+onAuthStateChanged(auth,async u=>{unsubs.forEach(f=>f());unsubs=[];ready=false;user=u;paint();if(!u)return;
+ try{await firstSync(u.uid);ready=true;paint();listen(u.uid);if(queue){queue=null;window.__rbSync({changed:S.pins.map(p=>p.id),removed:[],boards:true})}toast('☁️ Synced as '+u.email)}
+ catch(e){console.error(e);toast('⚠️ Sync failed: '+(e.code||e.message));user=u;paint()}});
+</script></body></html>
