@@ -43,9 +43,11 @@ label{font-size:13px;font-weight:700;color:var(--mute)}input,textarea,select{wid
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;opacity:0;transition:.2s;z-index:99;pointer-events:none;max-width:90vw;text-align:center}
 #toast.show{opacity:1}
 ol,ul{padding-left:20px}li{margin:3px 0}h4{margin:14px 0 4px}
+#authBtn{white-space:nowrap;font-size:13px;display:flex;gap:6px;align-items:center}#authBtn img{width:22px;height:22px;border-radius:50%}@media(max-width:600px){#authBtn .lbl{display:none}}
 </style></head><body>
 <header>
  <div class="bar"><span class="logo">📖 Recipe Book</span><input id="q" type="search" placeholder="Search pins, notes, boards, tags…">
+  <button class="btn" id="authBtn" title="Sync across devices">Sign in with Google</button>
   <button class="btn red" id="addBtn" title="Add pin">+</button>
   <div class="menu" id="menu"><button class="btn" id="menuBtn" aria-label="Menu">⋯</button><div>
    <button id="newBoard">New board</button><button id="favView">♥ Favorites only</button><button id="exportBtn">Export backup (JSON)</button><button id="importBtn">Import backup</button><button id="clearSample">Clear sample pins</button></div></div>
@@ -97,7 +99,20 @@ function trackDel(ps){ps.forEach(p=>{if(BUNDLED.some(b=>b.id===p.id)&&!S.deleted
 let view={board:'all',q:'',tag:null,fav:false},editing=null,pendingImg=null;
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2600)}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));return true}catch(e){toast('⚠️ Storage is full — export a backup, then delete some uploaded pins or use image URLs.');return false}}
+/* ---- sync support: timestamps + tombstones (works signed out too) ---- */
+let LAST={pins:{},boards:''};
+function pinJson(p){const{updatedAt,...r}=p;return JSON.stringify(r)}
+function boardsJson(){return JSON.stringify([S.boards,S.deletedBundled])}
+function snap(){LAST={pins:{},boards:boardsJson()};S.pins.forEach(p=>LAST.pins[p.id]=pinJson(p))}
+function stamp(){const now=Date.now();if(!S.deleted||typeof S.deleted!=='object')S.deleted={};if(!S.boardsAt)S.boardsAt=0;
+ const changed=[],seen={};S.pins.forEach(p=>{const j=pinJson(p);seen[p.id]=1;
+  if(LAST.pins[p.id]===undefined){if(!p.updatedAt)p.updatedAt=now;changed.push(p.id);if(S.deleted[p.id])delete S.deleted[p.id]}
+  else if(LAST.pins[p.id]!==j){p.updatedAt=now;changed.push(p.id)}});
+ const removed=Object.keys(LAST.pins).filter(id=>!seen[id]);removed.forEach(id=>S.deleted[id]=now);
+ const bj=boardsJson(),bc=bj!==LAST.boards||removed.length>0;if(bj!==LAST.boards)S.boardsAt=now;snap();return{changed,removed,boards:bc}}
+function initStamps(){if(!S.deleted||typeof S.deleted!=='object')S.deleted={};if(!S.boardsAt)S.boardsAt=0;S.pins.forEach(p=>{if(!p.updatedAt)p.updatedAt=p.created||Date.now()});snap()}
+function writeLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){const d=stamp();let ok=true;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){ok=false;toast('⚠️ Storage is full — export a backup, then delete some uploaded pins or use image URLs.')}if(window.__rbSync)window.__rbSync(d);return ok}
 const bname=id=>(S.boards.find(b=>b.id===id)||{}).name||'No board';
 const safeUrl=u=>/^(https?:|data:image\/)/i.test(u||'')?u:'';
 function filtered(){const q=view.q.toLowerCase();return S.pins.filter(p=>(view.board==='all'||p.board===view.board)&&(!view.fav||p.fav)&&(!view.tag||(p.tags||[]).includes(view.tag))&&(!q||[p.title,p.note,bname(p.board),(p.tags||[]).join(' '),p.recipe?p.recipe.ingredients.join(' '):''].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.created-a.created)}
@@ -172,5 +187,65 @@ F.onsubmit=e=>{e.preventDefault();const img=pendingImg||F.url.value.trim()||(edi
  const prev=JSON.stringify(S);
  if(editing){Object.assign(editing,data);if(!data.recipe)delete editing.recipe}else{const p={id:uid(),fav:false,created:Date.now(),...data};if(!p.recipe)delete p.recipe;S.pins.push(p)}
  if(!save()){S=JSON.parse(prev);return}$('#editor').close();render();toast(editing?'Pin updated':'Pin saved to '+bname(board))};
-render();
+initStamps();render();
+</script>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut,setPersistence,browserLocalPersistence}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getFirestore,doc,collection,getDoc,getDocs,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const app=initializeApp({apiKey:"AIzaSyCVMokUkUCGWe-MJowo8lyjFHNLEGR2OT4",authDomain:"recipe-book-lex-2ec15.firebaseapp.com",projectId:"recipe-book-lex-2ec15",storageBucket:"recipe-book-lex-2ec15.firebasestorage.app",messagingSenderId:"1029738704460",appId:"1:1029738704460:web:4019394d94d0755c504ee9"});
+const auth=getAuth(app),db=getFirestore(app),btn=document.getElementById('authBtn');
+const clean=o=>JSON.parse(JSON.stringify(o));
+let user=null,unsubs=[],ready=false,queue=null;
+const stateRef=u=>doc(db,'users',u,'data','state'),pinsCol=u=>collection(db,'users',u,'pins'),pinRef=(u,id)=>doc(db,'users',u,'pins',id);
+const isMobile=/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+function paint(){if(user){const ph=user.photoURL?`<img src="${esc(user.photoURL)}" alt="" referrerpolicy="no-referrer">`:'☁️';btn.innerHTML=`${ph}<span class="lbl">${ready?'Synced':'Syncing…'}</span>`;btn.title=`Signed in as ${user.email} — tap to sign out`}else{btn.innerHTML='<span>G</span><span class="lbl">Sign in with Google</span>';btn.title='Sign in to sync across devices'}}
+paint();
+setPersistence(auth,browserLocalPersistence).catch(()=>{});
+getRedirectResult(auth).catch(e=>{console.warn('redirect sign-in',e);toast('Sign-in failed: '+(e.code||e.message))});
+btn.onclick=async()=>{
+ if(user){if(confirm(`Signed in as ${user.email}.\nSign out? Recipes stay on this device.`))await signOut(auth);return}
+ const prov=new GoogleAuthProvider();prov.setCustomParameters({prompt:'select_account'});
+ try{await signInWithPopup(auth,prov)}catch(e){
+  if(['auth/popup-blocked','auth/operation-not-supported-in-environment','auth/web-storage-unsupported'].includes(e.code)||(isMobile&&e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')){try{await signInWithRedirect(auth,prov)}catch(e2){toast('Sign-in failed: '+(e2.code||e2.message))}}
+  else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')toast('Sign-in failed: '+(e.code||e.message))}};
+async function commit(ops){for(let i=0;i<ops.length;i+=400){const b=writeBatch(db);ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}}
+function stateDoc(){return clean({boards:S.boards,deletedBundled:S.deletedBundled||[],boardsAt:S.boardsAt||0,deleted:S.deleted||{}})}
+// push local changes (called from save())
+window.__rbSync=d=>{if(!user)return;if(!ready){queue=true;return}const u=user.uid,ops=[];
+ d.changed.forEach(id=>{const p=S.pins.find(x=>x.id===id);if(p)ops.push(b=>b.set(pinRef(u,id),clean(p)))});
+ d.removed.forEach(id=>ops.push(b=>b.delete(pinRef(u,id))));
+ if(d.boards)ops.push(b=>b.set(stateRef(u),stateDoc()));
+ if(ops.length)commit(ops).catch(e=>{console.error(e);toast('⚠️ Cloud save failed: '+(e.code||e.message))})};
+function applyLocal(){writeLocal();snap();render()}
+async function firstSync(u){
+ const[st,ps]=await Promise.all([getDoc(stateRef(u)),getDocs(pinsCol(u))]);
+ const remote={};ps.forEach(x=>remote[x.id]=x.data());const rs=st.exists()?st.data():null,ops=[];
+ if(!rs&&!ps.size){S.pins.forEach(p=>ops.push(b=>b.set(pinRef(u,p.id),clean(p))));ops.push(b=>b.set(stateRef(u),stateDoc()));await commit(ops);return}
+ // merge tombstones
+ const del={...(rs?.deleted||{})};Object.entries(S.deleted||{}).forEach(([k,v])=>{if(!(del[k]>=v))del[k]=v});S.deleted=del;
+ S.deletedBundled=[...new Set([...(S.deletedBundled||[]),...(rs?.deletedBundled||[])])];
+ // merge boards: union by id, newest side's names/order first
+ if(rs){const newer=(rs.boardsAt||0)>(S.boardsAt||0),A=newer?rs.boards||[]:S.boards,B=newer?S.boards:rs.boards||[];S.boards=[...A,...B.filter(b=>!A.some(a=>a.id===b.id))];S.boardsAt=Math.max(rs.boardsAt||0,S.boardsAt||0)}
+ // merge pins by id, newest updatedAt wins; tombstone wins if newer
+ const local={};S.pins.forEach(p=>local[p.id]=p);const out=[];
+ new Set([...Object.keys(local),...Object.keys(remote)]).forEach(id=>{const l=local[id],r=remote[id];
+  const w=!l?r:!r?l:((r.updatedAt||0)>(l.updatedAt||0)?r:l),t=del[id]||0;
+  if(t&&t>=(w.updatedAt||0)){if(r)ops.push(b=>b.delete(pinRef(u,id)));return}
+  out.push(w);if(w!==r&&(!r||JSON.stringify(clean(w))!==JSON.stringify(r)))ops.push(b=>b.set(pinRef(u,id),clean(w)))});
+ S.pins=out;ops.push(b=>b.set(stateRef(u),stateDoc()));applyLocal();await commit(ops)}
+function listen(u){
+ unsubs.push(onSnapshot(pinsCol(u),snapS=>{if(snapS.metadata.hasPendingWrites)return;let dirty=false;
+  snapS.docChanges().forEach(ch=>{const id=ch.doc.id,i=S.pins.findIndex(p=>p.id===id);
+   if(ch.type==='removed'){if(i>=0){S.pins.splice(i,1);dirty=true}return}
+   const r=ch.doc.data();if((S.deleted||{})[id]>=(r.updatedAt||0))return;
+   if(i<0){S.pins.push(r);dirty=true}else if((r.updatedAt||0)>=(S.pins[i].updatedAt||0)&&JSON.stringify(r)!==JSON.stringify(clean(S.pins[i]))){S.pins[i]=r;dirty=true}});
+  if(dirty)applyLocal()},e=>console.error('pins listener',e)));
+ unsubs.push(onSnapshot(stateRef(u),x=>{if(x.metadata.hasPendingWrites||!x.exists())return;const r=x.data();
+  S.deleted={...(S.deleted||{}),...(r.deleted||{})};S.deletedBundled=[...new Set([...(S.deletedBundled||[]),...(r.deletedBundled||[])])];
+  if((r.boardsAt||0)>(S.boardsAt||0)){S.boards=r.boards||[];S.boardsAt=r.boardsAt;if(view.board!=='all'&&!S.boards.some(b=>b.id===view.board))view.board='all'}
+  applyLocal()},e=>console.error('state listener',e)))}
+onAuthStateChanged(auth,async u=>{unsubs.forEach(f=>f());unsubs=[];ready=false;user=u;paint();if(!u)return;
+ try{await firstSync(u.uid);ready=true;paint();listen(u.uid);if(queue){queue=null;window.__rbSync({changed:S.pins.map(p=>p.id),removed:[],boards:true})}toast('☁️ Synced as '+u.email)}
+ catch(e){console.error(e);toast('⚠️ Sync failed: '+(e.code||e.message));user=u;paint()}});
 </script></body></html>
